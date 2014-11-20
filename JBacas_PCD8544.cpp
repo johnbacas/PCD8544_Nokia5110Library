@@ -1,0 +1,294 @@
+/***********************************************************************************
+This is a library for Monochrome Nokia 5110 LCD Displays.
+
+These displays use SPI to communicate, 4 or 5 pins are required to interface.
+This is a modified version of the library, made by John Bacas.
+The "begin" function dipslays "JB Electronics" logo
+
+1. There is a new "invertDisplay(boolean)" function that inverts the screen.
+2. The "clearDisplay()" function clears the buffer and not the screen.
+
+The original library is written by Limor Fried/Ladyada  for Adafruit Industries.
+and can be downloaded from
+https://github.com/adafruit/Adafruit-PCD8544-Nokia-5110-LCD-library
+************************************************************************************/
+
+//#include <Wire.h>
+#include <avr/pgmspace.h>
+#if defined(ARDUINO) && ARDUINO >= 100
+  #include "Arduino.h"
+#else
+  #include "WProgram.h"
+#endif
+#include <util/delay.h>
+#include <stdlib.h>
+
+#include <JBacas_GFX.h>
+#include "JBacas_PCD8544.h"
+
+// the memory buffer for the LCD
+uint8_t pcd8544_buffer[LCDWIDTH * LCDHEIGHT / 8] = {
+  0x80,  0x80,  0xe3,  0xff,  0xff,  0xff,  0xff,  0xff,  0xff,  0xff,  0xfe,  0xfc,
+  0xfd,  0xfc,  0xfc,  0xff,  0x9f,  0xf,  0x6f,  0x8f,  0xc3,  0xf0,  0xfc,  0xff,
+  0xff,  0x3f,  0x7,  0x81,  0xe0,  0xf8,  0xfe,  0xff,  0xff,  0xff,  0xff,  0xff,
+  0xff,  0xff,  0xff,  0xff,  0xff,  0xfc,  0xf0,  0x80,  0x1,  0xf,  0x7f,  0xff,
+  0xfe,  0xf8,  0xc1,  0xf,  0x7f,  0xff,  0xfc,  0xf8,  0xfb,  0xf8,  0xf9,  0x7b,
+  0xf3,  0xf3,  0xf7,  0x73,  0x33,  0x99,  0x99,  0x3d,  0xfc,  0xfc,  0xfe,  0xfe,
+  0xff,  0xff,  0xff,  0xff,  0xf1,  0xc4,  0x4,  0x1,  0x3f,  0xff,  0xff,  0xfe,
+  0xff,  0xff,  0xff,  0xff,  0xff,  0xff,  0xff,  0xff,  0x3f,  0x1f,  0xdf,  0x1f,
+  0xf,  0x8f,  0x8f,  0xf,  0x1f,  0x1f,  0x7f,  0xff,  0xff,  0xff,  0xff,  0xff,
+  0x80,  0x20,  0xa6,  0x8f,  0xff,  0xff,  0xff,  0xff,  0xf0,  0xe6,  0x0,  0x1,
+  0x1f,  0xff,  0xff,  0xff,  0x7f,  0x3f,  0x7f,  0x7f,  0xfe,  0xf0,  0x0,  0x61,
+  0x4f,  0x1f,  0xff,  0xff,  0xc0,  0xd9,  0xc3,  0xe3,  0xf3,  0xf9,  0xf8,  0xf2,
+  0xf2,  0xf8,  0xfe,  0xfe,  0xfe,  0xfe,  0xce,  0x86,  0x27,  0x87,  0xdf,  0xff,
+  0xff,  0xff,  0xff,  0xff,  0xe7,  0x81,  0x0,  0x8,  0x7e,  0xff,  0x87,  0x0,
+  0x7,  0x7,  0x17,  0xf7,  0x17,  0x7,  0xf7,  0x97,  0x97,  0x96,  0x66,  0x6,
+  0x7,  0x7,  0x7,  0x7,  0x4,  0x0,  0xf0,  0x93,  0x97,  0x97,  0x17,  0x7,
+  0xf7,  0x7,  0x7,  0x7,  0x7,  0x7,  0xf7,  0x97,  0x97,  0x97,  0x13,  0x0,
+  0xe0,  0x10,  0x17,  0x17,  0x24,  0x1,  0x31,  0x14,  0xf1,  0x11,  0x33,  0x3,
+  0xf7,  0x93,  0x93,  0x93,  0x61,  0x1,  0xe5,  0x11,  0x11,  0x13,  0xe3,  0x7,
+  0xf7,  0x47,  0x87,  0x7,  0xf7,  0x7,  0x7,  0x17,  0xf7,  0x13,  0x1,  0x1,
+  0xe3,  0x17,  0x17,  0x17,  0x27,  0x7,  0x64,  0x90,  0x90,  0x93,  0x27,  0x4,
+  0xf2,  0xf4,  0x34,  0x3,  0x0,  0xc0,  0xc7,  0xe4,  0xe4,  0xe4,  0xf3,  0xf0,
+  0xf0,  0x70,  0x30,  0x90,  0xb0,  0x30,  0xf7,  0xf4,  0xf4,  0xf4,  0xf4,  0xe0,
+  0xe7,  0xe4,  0xc4,  0xc4,  0x84,  0x80,  0x7,  0x84,  0x84,  0xc4,  0xc4,  0xc0,
+  0xe3,  0xe4,  0xe4,  0xf4,  0xf2,  0xf0,  0xf0,  0xf0,  0xf7,  0xf0,  0xf0,  0xf0,
+  0xf7,  0xf0,  0xf1,  0xf2,  0xf4,  0x80,  0x3,  0x4,  0x74,  0xf4,  0xb3,  0x10,
+  0x47,  0x0,  0x10,  0xf1,  0xf7,  0xe0,  0xc0,  0x44,  0x67,  0x74,  0xf0,  0xf0,
+  0xf3,  0xc4,  0x4,  0x4,  0x32,  0xf0,  0xc2,  0x4,  0x4,  0x14,  0x33,  0x10,
+  0xcf,  0x80,  0x30,  0x80,  0x86,  0xff,  0xff,  0xe1,  0xe4,  0xe4,  0x81,  0x3,
+  0x1,  0x0,  0x0,  0x1,  0x0,  0x4,  0x3f,  0x3f,  0x3f,  0xff,  0xff,  0xff,
+  0xff,  0xc7,  0x97,  0x97,  0xc7,  0xe7,  0xf7,  0xf3,  0xfb,  0xf9,  0xf9,  0xfd,
+  0xfc,  0xfe,  0xfe,  0xfc,  0xfc,  0xf9,  0xc1,  0x93,  0x93,  0xc7,  0xff,  0xff,
+  0xf9,  0xe0,  0x86,  0x0,  0x1f,  0x7f,  0xfc,  0xf0,  0x80,  0x1,  0xf,  0x7f,
+  0xfc,  0xf0,  0x80,  0x3,  0xf,  0x7f,  0xff,  0xf8,  0xfb,  0xe0,  0x4,  0x3f,
+  0xff,  0xff,  0xff,  0xf8,  0xe0,  0xe0,  0xc7,  0xc7,  0x87,  0xc6,  0xc6,  0x47,
+  0x7f,  0x1f,  0xf,  0xcf,  0x4f,  0xf,  0x1f,  0x7f,  0xff,  0xff,  0xe1,  0x60,
+  0x6c,  0x60,  0x30,  0x3c,  0x1e,  0x1c,  0x39,  0x39,  0xfc,  0xfe,  0xff,  0xff,
+  0xff,  0xff,  0x3f,  0x1,  0x0,  0xc6,  0xf0,  0xfb,  0x3f,  0xf,  0x7,  0xc3,
+  0xe1,  0xed,  0x63,  0x7f,  0x3f,  0x3f,  0x3f,  0x1f,  0x1f,  0xf,  0x8f,  0x8f,
+  0xc7,  0xc7,  0x47,  0x60,  0x60,  0x30,  0x3f,  0x1f,  0x1f,  0x2,  0x80,  0xe0,
+  0xf9,  0xff,  0xff,  0xfe,  0xf0,  0x80,  0x1,  0xf,  0x7f,  0xff,  0xff,  0xfe,
+  0xfe,  0xfc,  0xfd,  0xf9,  0xf9,  0xf9,  0xf9,  0xfd,  0xfc,  0xfc,  0xfe,  0xfe, 
+};
+
+
+// reduces how much is refreshed, which speeds it up!
+// originally derived from Steve Evans/JCW's mod but cleaned up and
+// optimized
+#define enablePartialUpdate
+
+#ifdef enablePartialUpdate
+static uint8_t xUpdateMin, xUpdateMax, yUpdateMin, yUpdateMax, letter;
+#endif
+
+
+
+static void updateBoundingBox(uint8_t xmin, uint8_t ymin, uint8_t xmax, uint8_t ymax) {
+#ifdef enablePartialUpdate
+  if (xmin < xUpdateMin) xUpdateMin = xmin;
+  if (xmax > xUpdateMax) xUpdateMax = xmax;
+  if (ymin < yUpdateMin) yUpdateMin = ymin;
+  if (ymax > yUpdateMax) yUpdateMax = ymax;
+#endif
+}
+
+Adafruit_PCD8544::Adafruit_PCD8544(int8_t SCLK, int8_t DIN, int8_t DC,
+    int8_t CS, int8_t RST) : Adafruit_GFX(LCDWIDTH, LCDHEIGHT) {
+  _din = DIN;
+  _sclk = SCLK;
+  _dc = DC;
+  _rst = RST;
+  _cs = CS;
+}
+
+Adafruit_PCD8544::Adafruit_PCD8544(int8_t SCLK, int8_t DIN, int8_t DC,
+    int8_t RST) : Adafruit_GFX(LCDWIDTH, LCDHEIGHT) {
+  _din = DIN;
+  _sclk = SCLK;
+  _dc = DC;
+  _rst = RST;
+  _cs = -1;
+}
+
+
+// the most basic function, set a single pixel
+void Adafruit_PCD8544::drawPixel(int16_t x, int16_t y, uint16_t color) {
+  if ((x < 0) || (x >= LCDWIDTH) || (y < 0) || (y >= LCDHEIGHT))
+    return;
+
+  // x is which column
+  if (color) 
+    pcd8544_buffer[x+ (y/8)*LCDWIDTH] |= _BV(y%8);  
+  else
+    pcd8544_buffer[x+ (y/8)*LCDWIDTH] &= ~_BV(y%8); 
+
+  updateBoundingBox(x,y,x,y);
+}
+
+
+// the most basic function, get a single pixel
+uint8_t Adafruit_PCD8544::getPixel(int8_t x, int8_t y) {
+  if ((x < 0) || (x >= LCDWIDTH) || (y < 0) || (y >= LCDHEIGHT))
+    return 0;
+
+  return (pcd8544_buffer[x+ (y/8)*LCDWIDTH] >> (y%8)) & 0x1;  
+}
+
+
+void Adafruit_PCD8544::begin(uint8_t contrast) {
+  // set pin directions
+  pinMode(_din, OUTPUT);
+  pinMode(_sclk, OUTPUT);
+  pinMode(_dc, OUTPUT);
+  if (_rst > 0)
+    pinMode(_rst, OUTPUT);
+  if (_cs > 0)
+    pinMode(_cs, OUTPUT);
+
+  // toggle RST low to reset
+  if (_rst > 0) {
+    digitalWrite(_rst, LOW);
+    _delay_ms(500);
+    digitalWrite(_rst, HIGH);
+  }
+
+  clkport     = portOutputRegister(digitalPinToPort(_sclk));
+  clkpinmask  = digitalPinToBitMask(_sclk);
+  mosiport    = portOutputRegister(digitalPinToPort(_din));
+  mosipinmask = digitalPinToBitMask(_din);
+  csport    = portOutputRegister(digitalPinToPort(_cs));
+  cspinmask = digitalPinToBitMask(_cs);
+  dcport    = portOutputRegister(digitalPinToPort(_dc));
+  dcpinmask = digitalPinToBitMask(_dc);
+
+  // get into the EXTENDED mode!
+  command(PCD8544_FUNCTIONSET | PCD8544_EXTENDEDINSTRUCTION );
+
+  // LCD bias select (4 is optimal?)
+  command(PCD8544_SETBIAS | 0x4);
+
+  // set VOP
+  if (contrast > 0x7f) contrast = 0x7f;
+  command( PCD8544_SETVOP | contrast); // Experimentally determined
+
+  // normal display mode
+  command(PCD8544_FUNCTIONSET);
+  command(PCD8544_DISPLAYCONTROL | PCD8544_DISPLAYNORMAL);
+
+  // set up a bounding box for screen updates
+  updateBoundingBox(0, 0, LCDWIDTH-1, LCDHEIGHT-1);
+  // Push out pcd8544_buffer to the Display (will show the JB Electronics logo)
+  display();
+}
+
+
+inline void Adafruit_PCD8544::fastSPIwrite(uint8_t d) {
+  
+  for(uint8_t bit = 0x80; bit; bit >>= 1) {
+    *clkport &= ~clkpinmask;
+    if(d & bit) *mosiport |=  mosipinmask;
+    else        *mosiport &= ~mosipinmask;
+    *clkport |=  clkpinmask;
+  }
+}
+
+inline void Adafruit_PCD8544::slowSPIwrite(uint8_t c) {
+  shiftOut(_din, _sclk, MSBFIRST, c);
+}
+
+void Adafruit_PCD8544::command(uint8_t c) {
+  digitalWrite(_dc, LOW);
+  if (_cs > 0)
+    digitalWrite(_cs, LOW);
+  fastSPIwrite(c);
+  if (_cs > 0)
+    digitalWrite(_cs, HIGH);
+}
+
+void Adafruit_PCD8544::data(uint8_t c) {
+  digitalWrite(_dc, HIGH);
+  if (_cs > 0)
+    digitalWrite(_cs, LOW);
+  fastSPIwrite(c);
+  if (_cs > 0)
+    digitalWrite(_cs, HIGH);
+}
+
+void Adafruit_PCD8544::setContrast(uint8_t val) {
+  if (val > 0x7f) {
+    val = 0x7f;
+  }
+  command(PCD8544_FUNCTIONSET | PCD8544_EXTENDEDINSTRUCTION );
+  command( PCD8544_SETVOP | val); 
+  command(PCD8544_FUNCTIONSET);
+  
+ }
+
+void Adafruit_PCD8544::display(void) {
+  uint8_t col, maxcol, p;
+  
+  for(p = 0; p < 6; p++) {
+#ifdef enablePartialUpdate
+    // check if this page is part of update
+    if ( yUpdateMin >= ((p+1)*8) ) {
+      continue;   // nope, skip it!
+    }
+    if (yUpdateMax < p*8) {
+      break;
+    }
+#endif
+
+    command(PCD8544_SETYADDR | p);
+
+
+#ifdef enablePartialUpdate
+    col = xUpdateMin;
+    maxcol = xUpdateMax;
+#else
+    // start at the beginning of the row
+    col = 0;
+    maxcol = LCDWIDTH-1;
+#endif
+
+    command(PCD8544_SETXADDR | col);
+
+    digitalWrite(_dc, HIGH);
+    if (_cs > 0)
+      digitalWrite(_cs, LOW);
+    for(; col <= maxcol; col++) {
+      //uart_putw_dec(col);
+      //uart_putchar(' ');
+      fastSPIwrite(pcd8544_buffer[(LCDWIDTH*p)+col]);
+    }
+    if (_cs > 0)
+      digitalWrite(_cs, HIGH);
+
+  }
+
+#ifdef enablePartialUpdate
+  xUpdateMin = LCDWIDTH - 1;
+  xUpdateMax = 0;
+  yUpdateMin = LCDHEIGHT-1;
+  yUpdateMax = 0;
+#endif
+
+}
+// invert display
+void Adafruit_PCD8544::invertDisplay(boolean i) {
+	if (i){
+  command(PCD8544_FUNCTIONSET);
+  command(PCD8544_DISPLAYCONTROL | PCD8544_DISPLAYINVERTED);
+  }
+  else {
+  command(PCD8544_FUNCTIONSET);
+  command(PCD8544_DISPLAYCONTROL | PCD8544_DISPLAYNORMAL);
+  }
+}
+
+// clear buffer
+void Adafruit_PCD8544::clearDisplay(void) {
+  memset(pcd8544_buffer, 0, LCDWIDTH*LCDHEIGHT/8);
+  updateBoundingBox(0, 0, LCDWIDTH-1, LCDHEIGHT-1);
+  cursor_y = cursor_x = 0;
+}
