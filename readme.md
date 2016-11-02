@@ -8,6 +8,7 @@ The JBacas_PCD8544 Library can be found at: https://github.com/johnbacas/PCD8544
 The JBacas_GFX Library can be found at: https://github.com/johnbacas/GFX_Library.git
 
 The JBacas_PCD8544 Library contains 3 examples:
+
 1. Display_characters.ino : This file displays all the character-set of the glcd_greek.c file
    which contains 5x7 and 6x8 characters. This font library was mainly created to support greek letters.
 
