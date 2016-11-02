@@ -1,6 +1,3 @@
-Nokia5110Library
-================
-
 This project contains some modified versions of Adafruit Libraries (Adafruit_PCD8544, Adafruit_GFX)
 which respectively are named JBacas_PCD8544 & JBacas_GFX.
 
